@@ -1,0 +1,7 @@
+path: /opt/data/private/hyy/datasets/licence_plate_datasets
+train: images/train
+val: images/val
+test: images/test
+
+nc: 1
+names: [licence]
