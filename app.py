@@ -39,6 +39,7 @@ def upload_ld_model():
 def get_videolist():
     datanames=os.listdir("./videos")
     datanames.sort()
+    namesofvideo=[]
     for dataname in datanames:
         if os.path.splitext(dataname)[1] == '.jpg':
             namesofvideo.append(dataname)
@@ -89,4 +90,4 @@ if __name__ == '__main__':
     if not os.path.exists('./weights/yolov5'):
         os.makedirs('./weights/yolov5')
     
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
