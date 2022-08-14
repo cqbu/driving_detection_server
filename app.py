@@ -1,5 +1,6 @@
-from flask import Flask, request,send_from_directory
+from flask import Flask, request, send_from_directory
 import os
+import json
 
 app = Flask(__name__)
 
@@ -35,6 +36,13 @@ def download(image_name):
     if os.path.isfile(os.path.join("videos", image_name)):
         return send_from_directory("videos", image_name)
     pass
+
+@app.route('/submit', methods=['POST'])
+def submit_task():
+    data = request.get_data()
+    data = json.loads(data)
+    print(data)
+    return 'submitted'
 
 if __name__ == '__main__':
     if not os.path.exists('./videos'):
