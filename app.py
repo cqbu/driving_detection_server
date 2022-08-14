@@ -76,6 +76,12 @@ def get_all_task_configs():
     infos = [task.get_info() for task in tl]
     return jsonify(infos)
 
+# 删除任务
+@app.route('/taskdelete/<int:task_id>')
+def delete_task(task_id):
+    tl.remove(task_id)
+    return 'Delete successfully'
+
 @app.route('/taskrun/<int:task_id>')
 def task_run(task_id):
     task = tl[task_id]
