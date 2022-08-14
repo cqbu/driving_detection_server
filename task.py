@@ -7,23 +7,36 @@ config是一个dict，包含以下信息：
     - clrnet_backbone：str，backbone名称，包括'r18'，'r34'，'m3s'，'m3l'等
     - yolov5_period：int，yolov5处理周期，即每period帧处理一次，默认值为1
     - clrnet_period：int，clrnet处理周期，即每period帧处理一次，默认值为1
+
+self.__info会在config的基础上增加以下信息：
+    - status：str，表示任务运行状态，有waiting，running，done三种
+    - progress: float，表示任务进度，取值[0-1]
 """
 
 class Task:
     def __init__(self, config: dict):
-        self.__config = config
-        self.__status = 'waiting' # waiting, running, done
-    
-    def run(self):
-        self.__status = 'running'
+        self.__info = config
+        self.__info.update({'status': 'waiting'})
+        self.__info.update({'progress': 0.0})
         
-        self.__status = 'done'
+    def run(self):
+        self.__info['status'] = 'running'
+        import time
+        for i in range(20):
+            self.__info['progress'] = i * 0.01
+            print(self.__info['progress'])
+            time.sleep(1)
+        
+        self.__info['status'] = 'done'
 
-    def get_config(self):
-        return self.__config
+    def get_info(self):
+        return self.__info
     
     def get_status(self):
-        return self.__status
+        return self.__info['status']
+
+    def get_progress(self):
+        return self.__info['progress']
         
 
 class TaskList:

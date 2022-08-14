@@ -1,8 +1,10 @@
 from flask import Flask, request, send_from_directory, jsonify
 from task import Task, TaskList
+from concurrent.futures import ThreadPoolExecutor
 import os
 import json
 
+executor = ThreadPoolExecutor(8)
 app = Flask(__name__)
 tl = TaskList()
 
@@ -51,14 +53,20 @@ def submit_task():
 # 查询某个任务配置信息
 @app.route('/tasklist/<int:task_id>', methods=['GET'])
 def get_task_config(task_id):
-    config = tl[task_id].get_config()
+    config = tl[task_id].get_info()
     return jsonify(config)
 
 # 查询所有任务配置信息
 @app.route('/tasklist', methods=['GET'])
 def get_all_task_configs():
-    configs = [task.get_config() for task in tl]
+    configs = [task.get_info() for task in tl]
     return jsonify(configs)
+
+@app.route('/taskrun/<int:task_id>')
+def task_run(task_id):
+    task = tl[task_id]
+    executor.submit(task.run)
+    return 'done'
 
 if __name__ == '__main__':
     if not os.path.exists('./videos'):
