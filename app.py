@@ -1,8 +1,10 @@
-from flask import Flask, request, send_from_directory
+from flask import Flask, request, send_from_directory, jsonify
+from task import Task, TaskList
 import os
 import json
 
 app = Flask(__name__)
+tl = TaskList()
 
 @app.route('/index')
 def index():
@@ -28,6 +30,7 @@ def upload_ld_model():
     file = request.files.get('file')
     file.save(os.path.join('./weights/CLRNet', file.filename))
     return 'Upload successfully'
+
 @app.route('/download/<string:image_name>', methods=['GET'])
 def download(image_name):
     image_name = os.path.basename(image_name)
@@ -37,12 +40,25 @@ def download(image_name):
         return send_from_directory("videos", image_name)
     pass
 
+# 提交任务配置
 @app.route('/submit', methods=['POST'])
 def submit_task():
-    data = request.get_data()
-    data = json.loads(data)
-    print(data)
+    config = request.get_data()
+    config = json.loads(config)
+    tl.add(config)
     return 'submitted'
+
+# 查询某个任务配置信息
+@app.route('/tasklist/<int:task_id>', methods=['GET'])
+def get_task_config(task_id):
+    config = tl[task_id].get_config()
+    return jsonify(config)
+
+# 查询所有任务配置信息
+@app.route('/tasklist', methods=['GET'])
+def get_all_task_configs():
+    configs = [task.get_config() for task in tl]
+    return jsonify(configs)
 
 if __name__ == '__main__':
     if not os.path.exists('./videos'):
