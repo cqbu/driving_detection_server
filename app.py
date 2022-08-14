@@ -7,6 +7,11 @@ import json
 executor = ThreadPoolExecutor(8)
 app = Flask(__name__)
 tl = TaskList()
+submitdata={
+    "namesofvideo":[],
+    "weightsofyolov5":[],
+    "weightsofCLR":[]
+};
 namesofvideo =[];
 
 @app.route('/index')
@@ -39,12 +44,24 @@ def upload_ld_model():
 def get_videolist():
     datanames=os.listdir("./videos")
     datanames.sort()
-    namesofvideo=[]
+    submitdata={
+    "namesofvideo":[],
+    "weightsofyolov5":[],
+    "weightsofCLR":[]
+};
     for dataname in datanames:
         if os.path.splitext(dataname)[1] == '.jpg':
-            namesofvideo.append(dataname)
-            print(dataname)
-    return jsonify(namesofvideo)
+            submitdata['namesofvideo'].append(dataname.split(".")[0]+".mp4")
+    datanames=os.listdir("./weights/yolov5")
+    datanames.sort()
+    for dataname in datanames:
+            submitdata['weightsofyolov5'].append(dataname)
+    datanames=os.listdir("./weights/CLRNet")
+    datanames.sort()
+    for dataname in datanames:
+            submitdata['weightsofCLR'].append(dataname)
+    print(submitdata)
+    return jsonify(submitdata)
 
 #显示图片
 @app.route('/download/<string:image_name>', methods=['GET'])
