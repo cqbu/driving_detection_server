@@ -53,14 +53,14 @@ def submit_task():
 # 查询某个任务配置信息
 @app.route('/tasklist/<int:task_id>', methods=['GET'])
 def get_task_config(task_id):
-    config = tl[task_id].get_info()
-    return jsonify(config)
+    info = tl[task_id].get_info()
+    return jsonify(info)
 
 # 查询所有任务配置信息
 @app.route('/tasklist', methods=['GET'])
 def get_all_task_configs():
-    configs = [task.get_info() for task in tl]
-    return jsonify(configs)
+    infos = [task.get_info() for task in tl]
+    return jsonify(infos)
 
 @app.route('/taskrun/<int:task_id>')
 def task_run(task_id):
