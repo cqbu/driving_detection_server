@@ -22,10 +22,10 @@ class Task:
     def run(self):
         self.__info['status'] = 'running'
         import time
-        for i in range(20):
+        for i in range(101):
             self.__info['progress'] = i * 0.01
             print(self.__info['progress'])
-            time.sleep(1)
+            time.sleep(0.12)
         
         self.__info['status'] = 'done'
 
@@ -54,7 +54,7 @@ class TaskList:
     def remove(self, key):
         if isinstance(key, int):
             task = self.__list.pop(key)
-            name = task.get_config()['name']
+            name = task.get_info()['name']
             self.__name_dict.pop(name)
         elif isinstance(key, str):
             task = self.__name_dict.pop(key)
