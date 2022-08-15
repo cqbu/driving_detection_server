@@ -1,8 +1,9 @@
-from flask import Flask, request, send_from_directory, jsonify
+from flask import Flask, request, send_from_directory, jsonify, Response
 from task import Task, TaskList
 from concurrent.futures import ThreadPoolExecutor
 import os
 import json
+import cv2
 
 executor = ThreadPoolExecutor(8)
 app = Flask(__name__)
@@ -105,9 +106,30 @@ def task_run(task_id):
     executor.submit(task.run)
     return 'done'
 
+def generate_frames(video_path):
+    video = cv2.VideoCapture(video_path)
+    while True:
+        success, frame = video.read()
+        if success:
+            ret, buffer = cv2.imencode('.jpg', frame)
+            frame = buffer.tobytes()
+        else:
+            break
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+# 在线视频流
+@app.route('/onlinevideo/<string:video_name>')
+def video(video_name):
+    video_path = os.path.join('output', video_name)
+    return Response(generate_frames(video_path=video_path),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
+
 if __name__ == '__main__':
     if not os.path.exists('./videos'):
         os.makedirs('./videos')
+    if not os.path.exists('./output'):
+        os.makedirs('./output')
     if not os.path.exists('./weights/CLRNet'):
         os.makedirs('./weights/CLRNet')
     if not os.path.exists('./weights/yolov5'):
