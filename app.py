@@ -120,10 +120,28 @@ def generate_frames(video_path):
 
 # 在线视频流
 @app.route('/onlinevideo/<string:video_name>')
-def video(video_name):
+def online_video(video_name):
     video_path = os.path.join('output', video_name)
     return Response(generate_frames(video_path=video_path),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
+
+def generate_download_stream(file_path):
+    if not os.path.exists(file_path):
+        raise FileNotFoundError
+    with open(file_path, "rb") as f:
+        while True:
+            chunk = f.read(3 * 1024 * 1024)
+            if not chunk:
+                break
+            yield chunk
+
+# 下载输出文件
+@app.route('/downloadoutput/<string:video_name>')
+def download_output(video_name):
+    video_path = os.path.join('output', video_name)
+    response = Response(generate_download_stream(video_path), content_type="application/octet-stream")
+    response.headers['content-length'] = os.stat(str(video_path)).st_size
+    return response
 
 if __name__ == '__main__':
     if not os.path.exists('./videos'):
