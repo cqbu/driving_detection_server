@@ -130,7 +130,7 @@ def generate_download_stream(file_path):
         raise FileNotFoundError
     with open(file_path, "rb") as f:
         while True:
-            chunk = f.read(3 * 1024 * 1024)
+            chunk = f.read(20 * 1024 * 1024)
             if not chunk:
                 break
             yield chunk
