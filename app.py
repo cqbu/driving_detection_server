@@ -71,7 +71,7 @@ def download(image_name):
     image_name=image_name+".jpg"
     if os.path.isfile(os.path.join("videos", image_name)):
         return send_from_directory("videos", image_name)
-    pass
+    pass 
 
 # 提交任务配置
 @app.route('/submit', methods=['POST'])
@@ -79,6 +79,7 @@ def submit_task():
     config = request.get_data()
     config = json.loads(config)
     tl.add(config)
+    print(config)
     return 'submitted'
 
 # 查询某个任务配置信息
@@ -113,4 +114,4 @@ if __name__ == '__main__':
     if not os.path.exists('./weights/yolov5'):
         os.makedirs('./weights/yolov5')
     
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True) 
