@@ -3,12 +3,26 @@ from task import Task, TaskList
 from concurrent.futures import ThreadPoolExecutor
 import os
 import json
+import cv2
+import sys
+sys.path.append('./yolov5')
+from yolov5.utils.augmentations import letterbox
+from yolov5.utils.torch_utils import select_device
+from yolov5.models.common import DetectMultiBackend
+from yolov5.utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr,
+                           increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
+from yolov5.utils.plots import Annotator, colors, save_one_box
+import numpy as np
+import torch 
+#load model
+device=''
+device = select_device(device)
 
 executor = ThreadPoolExecutor(8)
 app = Flask(__name__)
 tl = TaskList()
 submitdata={
-    "namesofvideo":[],
+    "namesofvideo":[], 
     "weightsofyolov5":[],
     "weightsofCLR":[]
 };
@@ -39,7 +53,7 @@ def upload_ld_model():
     file.save(os.path.join('./weights/CLRNet', file.filename))
     return 'Upload successfully'
 
-# 查询已存在图片信息并返回
+# 查询已存在信息并返回
 @app.route('/videolist', methods=['GET'])
 def get_videolist():
     datanames=os.listdir("./videos")
@@ -73,6 +87,69 @@ def download(image_name):
         return send_from_directory("videos", image_name)
     pass 
 
+def run_task(config):
+    model = DetectMultiBackend(os.path.join('./weights/yolov5',config['yolov5_model_name']), device=device, dnn=False, data="./yolov5/data/_bdd100k.yaml")  
+    video = cv2.VideoCapture(os.path.join('./videos',config['video_name']))
+    fps = video.get(cv2.CAP_PROP_FPS)
+    video_size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    output = cv2.VideoWriter(os.path.join('output', config['video_name']), cv2.VideoWriter_fourcc(*'XVID'),
+                             fps, video_size)
+    model.model.float()
+    while video.isOpened():
+        ret  , frame =  video.read()
+        if not ret:
+            break
+        pred,stride,pt=yolosingelimage(frame,model)
+        frame = addboxes(pred,frame,model)
+        output.write(frame)
+        for i in range(config['yolov5_period']-1):
+            ret  , frame =  video.read()
+            if not ret:
+                break
+            frame = addboxes(pred,frame,model)
+            output.write(frame)
+    video.release()
+    output.release()
+def yolosingelimage(img , model):
+    stride, names, pt, jit, onnx, engine = model.stride, model.names, model.pt, model.jit, model.onnx, model.engine
+    imgsz = check_img_size([640,640], s=stride)  # check image size
+    model.eval()
+    assert isinstance(model, DetectMultiBackend)
+    img0,x,(dw,dh)= letterbox(img,imgsz,stride=stride,auto=pt)
+    img0 = img0.transpose((2, 0, 1))[::-1]
+    img0 = np.ascontiguousarray(img0)
+    img0 = torch.from_numpy(img0).to(model.device)
+    img0 = img0.float()
+    img0 /= 255
+    img0 = img0.unsqueeze(0)
+    pred=model(img0,augment=False, visualize=False)
+    print('type(pred): ', type(pred))
+    pred = non_max_suppression(pred, conf_thres=0.25, iou_thres=0.45,
+    classes=None, agnostic=False, max_det=1000)
+    return pred,stride,pt
+def addboxes(pred,img,model):
+    stride, names, pt, jit, onnx, engine = model.stride, model.names, model.pt, model.jit, model.onnx, model.engine
+    imgsz = check_img_size([640,640], s=stride) 
+    img0,x,(dw,dh)= letterbox(img,imgsz,stride=stride,auto=pt)
+    img0 = img0.transpose((2, 0, 1))[::-1]
+    img0 = np.ascontiguousarray(img0)
+    img0 = torch.from_numpy(img0).to(model.device)
+    img0 = img0.float()
+    img0 /= 255
+    img0 = img0.unsqueeze(0)
+    for i,det0 in enumerate(pred):
+        det = det0.clone()
+        img_=img.copy()
+        annotator = Annotator(img_, line_width=3, example=str(names))
+        if len(det):
+            det[:,:4] = scale_coords(img0.shape[2:],det[:,:4],img_.shape).round()
+            for *xyxy, conf, cls in reversed(det):
+                c = int(cls)
+                label =  f'{names[c]} {conf:.2f}'
+                annotator.box_label(xyxy, label, color=colors(c, True))
+        img_=annotator.result()
+    return img_
+    
 # 提交任务配置
 @app.route('/submit', methods=['POST'])
 def submit_task():
@@ -80,14 +157,14 @@ def submit_task():
     config = json.loads(config)
     tl.add(config)
     print(config)
+    run_task(config)
     return 'submitted'
-
 # 查询某个任务配置信息
 @app.route('/tasklist/<int:task_id>', methods=['GET'])
 def get_task_config(task_id):
     info = tl[task_id].get_info()
     return jsonify(info)
-
+    
 # 查询所有任务配置信息
 @app.route('/tasklist', methods=['GET'])
 def get_all_task_configs():
@@ -114,4 +191,4 @@ if __name__ == '__main__':
     if not os.path.exists('./weights/yolov5'):
         os.makedirs('./weights/yolov5')
     
-    app.run(host="0.0.0.0", port=5000, debug=True) 
+    app.run(host="0.0.0.0", port=5000, debug=True)  

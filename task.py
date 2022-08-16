@@ -37,6 +37,9 @@ class Task:
 
     def get_progress(self):
         return self.__info['progress']
+    
+    def set_progress(self, progress):
+        self.__info['progress'] = progress
         
 
 class TaskList:
