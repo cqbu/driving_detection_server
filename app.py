@@ -99,47 +99,64 @@ def download(image_name):
     pass 
 
 def run_task(task: Task):
-    task.set_status('running')
-    config = task.get_info()
-    yolo_model = DetectMultiBackend(os.path.join('./weights/yolov5',config['yolov5_model_name']), device=device, dnn=False, data="./yolov5/data/bdd100k.yaml")  
-    video = cv2.VideoCapture(os.path.join('./videos',config['video_name']))
-    fps = video.get(cv2.CAP_PROP_FPS)
-    video_size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-    output = cv2.VideoWriter(os.path.join('output',config['name']+'_' + config['video_name']), cv2.VideoWriter_fourcc(*'XVID'),
-                             fps, video_size)
-    num_frame = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-    yolo_model.model.float()
-    clr_config = cfg = Config.fromfile(backbones_configs[config["clrnet_backbone"]])
-    print ("buidingclr_model")
-    clr_model,clr_cfg=build_model(backbones_configs[config["clrnet_backbone"]],os.path.join("./weights/CLRNet",config['clrnet_model_name']))
-    print("builded clrmodel")
-    cnt_yolo = 0
-    cnt_clr = 0
-    while video.isOpened():
-        ret  , frame =  video.read()
-        if not ret:
-            break
-        if cnt_yolo % config['yolov5_period'] == 0:
-            pred,stride,pt=yolosingelimage(frame,yolo_model)
-        if cnt_clr % config['clrnet_period'] == 0:
-            lanes = clr_inference_single_image(frame,clr_model,clr_config)
-        frame = addboxes(pred,frame,yolo_model)
-        sample = get_sample(frame,clr_cfg)
-        frame = show_lanes(sample,lanes)
-        output.write(frame)
-        cnt_yolo = cnt_yolo + 1
-        cnt_clr = cnt_clr +1
-        task.set_progress(cnt_yolo / num_frame)
-        
-        # for i in range(config['yolov5_period']-1):
-        #     ret  , frame =  video.read()
-        #     if not ret:
-        #         break
-        #     frame = addboxes(pred,frame,model)
-        #     output.write(frame)
-    video.release()
-    output.release()
-    task.set_status('done')
+    try:
+        task.set_status('running')
+        config = task.get_info()
+        yolov5_path = os.path.join('./weights/yolov5',config['yolov5_model_name'])
+        try:
+            yolo_model = DetectMultiBackend(yolov5_path, device=device, dnn=False, data="./yolov5/data/bdd100k.yaml")
+        except Exception:
+            raise Exception(f'无法载入yolov5模型：{yolov5_path}')
+        video_path = os.path.join('./videos',config['video_name'])
+        video = cv2.VideoCapture(video_path)
+        if not video.isOpened():
+            raise Exception(f'无法打开视频: {video_path}')
+        fps = video.get(cv2.CAP_PROP_FPS)
+        video_size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+        output = cv2.VideoWriter(os.path.join('output',config['name']+'_' + config['video_name']), cv2.VideoWriter_fourcc(*'XVID'),
+                                fps, video_size)
+        num_frame = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+        yolo_model.model.float()
+        clr_config = cfg = Config.fromfile(backbones_configs[config["clrnet_backbone"]])
+        print ("buidingclr_model")
+        clr_path = os.path.join("./weights/CLRNet",config['clrnet_model_name'])
+        try:
+            clr_model,clr_cfg=build_model(backbones_configs[config["clrnet_backbone"]], clr_path)
+        except Exception:
+            raise Exception(f'无法载入CLRNet模型：{clr_path}')
+        print("builded clrmodel")
+        cnt_yolo = 0
+        cnt_clr = 0 
+        while video.isOpened():
+            ret  , frame =  video.read()
+            if not ret:
+                break
+            if cnt_yolo % config['yolov5_period'] == 0:
+                pred,stride,pt=yolosingelimage(frame,yolo_model)
+            if cnt_clr % config['clrnet_period'] == 0:
+                lanes = clr_inference_single_image(frame,clr_model,clr_config)
+            frame = addboxes(pred,frame,yolo_model)
+            sample = get_sample(frame,clr_cfg)
+            frame = show_lanes(sample,lanes)
+            output.write(frame)
+            cnt_yolo = cnt_yolo + 1
+            cnt_clr = cnt_clr +1
+            task.set_progress(cnt_yolo / num_frame)
+            
+            # for i in range(config['yolov5_period']-1):
+            #     ret  , frame =  video.read()
+            #     if not ret:
+            #         break
+            #     frame = addboxes(pred,frame,model)
+            #     output.write(frame)
+        video.release()
+        output.release()
+        task.set_status('done')
+    except Exception as e:
+        task.set_status('fail')
+        task.set_err_msg(str(e))
+        print(task.get_info())
+    
 def clr_inference_single_image(img, model, cfg):
     sample = get_sample(img, cfg)
     with torch.no_grad():

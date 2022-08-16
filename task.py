@@ -11,6 +11,7 @@ config是一个dict，包含以下信息：
 self.__info会在config的基础上增加以下信息：
     - status：str，表示任务运行状态，有waiting，running，done三种
     - progress: float，表示任务进度，取值[0-1]
+    - err_msg: str，错误信息
 """
 
 class Task:
@@ -18,6 +19,7 @@ class Task:
         self.__info = config
         self.__info.update({'status': 'waiting'})
         self.__info.update({'progress': 0.0})
+        self.__info.update({'err_msg': 'none'})
         
     def run(self):
         self.__info['status'] = 'running'
@@ -43,7 +45,9 @@ class Task:
         
     def set_status(self, status):
         self.__info['status'] = status
-        
+    
+    def set_err_msg(self, err_msg):
+        self.__info['err_msg'] = err_msg
 
 class TaskList:
     def __init__(self):
