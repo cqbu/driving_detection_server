@@ -3,7 +3,7 @@ videos/
 weights/
 /output
 /test.py
-/core
+core
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
