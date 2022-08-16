@@ -148,6 +148,23 @@ def inference_video(model, cfg, video_path, output_dir, filename):
         output.write(frame)
     video.release()
     output.release()
+    
+def build_model(config_path, weights_path, use_cuda=True, training=False):
+    cfg = Config.fromfile(config_path)
+    cfg.load_from = weights_path
+    cfg.resume_from, cfg.finetune_from = None, None
+    cfg.view = False
+    cfg.seed = 0
+    cfg.gpus = 1
+    
+    model = build_net(cfg)
+    model = MMDataParallel(model, device_ids=range(cfg.gpus))
+    resume_model(model, cfg)
+    if use_cuda:
+        model = model.cuda()
+    if not training:
+        model.eval()
+    return model, cfg
         
 def main():
     # image_path = '/opt/data/private/hyy/datasets/CULane/driver_100_30frame/05251517_0433.MP4/00000.jpg'
