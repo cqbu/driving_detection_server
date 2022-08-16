@@ -3,7 +3,7 @@ net = dict(type='Detector', )
 backbone = dict(
     type='MobileNetV3Wrapper',
     mobilenet='small',
-    pretrained=True
+    pretrained=False
 )
 
 num_points = 72

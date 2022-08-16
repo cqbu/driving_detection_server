@@ -3,7 +3,7 @@ net = dict(type='Detector', )
 backbone = dict(
     type='ResNetWrapper',
     resnet='resnet101',
-    pretrained=True,
+    pretrained=False,
     replace_stride_with_dilation=[False, False, False],
     out_conv=False,
 )

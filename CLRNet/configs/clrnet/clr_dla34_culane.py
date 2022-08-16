@@ -3,7 +3,7 @@ net = dict(type='Detector', )
 backbone = dict(
     type='DLAWrapper',
     dla='dla34',
-    pretrained=True,
+    pretrained=False,
 )
 
 num_points = 72
