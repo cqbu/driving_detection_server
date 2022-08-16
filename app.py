@@ -6,18 +6,20 @@ import json
 import cv2
 import sys
 sys.path.append('./yolov5')
+sys.path.append('./CLRNet')
 from yolov5.utils.augmentations import letterbox
 from yolov5.utils.torch_utils import select_device
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr,
                            increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
 from yolov5.utils.plots import Annotator, colors, save_one_box
+from CLRNet.infer import build_model,get_sample,show_lanes
+from CLRNet.clrnet.utils.config import Config
 import numpy as np
 import torch 
 #load model
 device=''
 device = select_device(device)
-
 executor = ThreadPoolExecutor(8)
 app = Flask(__name__)
 tl = TaskList()
@@ -25,7 +27,12 @@ submitdata={
     "namesofvideo":[], 
     "weightsofyolov5":[],
     "weightsofCLR":[]
-};
+}
+backbones_configs={
+    "Resnet18":"./CLRNet/configs/clrnet/clr_resnet18_culane.py",
+    "m3s":"./CLRNet/configs/clrnet/clr_mobilenetv3s_culane.py",
+    "m3l":"./CLRNet/configs/clrnet/clr_mobilenetv3l_culane.py"
+}
 namesofvideo =[];
 
 @app.route('/index')
@@ -37,6 +44,10 @@ def index():
 def upload_video():
     file = request.files.get('file')
     file.save(os.path.join('./videos', file.filename))
+    video = cv2.VideoCapture(os.path.join('./videos',file.filename))
+    ret,frame = video.read()
+    cv2.imwrite(os.path.join("./videos",file.filename.split('.')[0]+".jpg"),frame)
+    video.release()
     return 'Upload successfully'
 
 # 上传物体检测模型
@@ -90,26 +101,35 @@ def download(image_name):
 def run_task(task: Task):
     task.set_status('running')
     config = task.get_info()
-    model = DetectMultiBackend(os.path.join('./weights/yolov5',config['yolov5_model_name']), device=device, dnn=False, data="./yolov5/data/bdd100k.yaml")  
+    yolo_model = DetectMultiBackend(os.path.join('./weights/yolov5',config['yolov5_model_name']), device=device, dnn=False, data="./yolov5/data/bdd100k.yaml")  
     video = cv2.VideoCapture(os.path.join('./videos',config['video_name']))
     fps = video.get(cv2.CAP_PROP_FPS)
     video_size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-    output = cv2.VideoWriter(os.path.join('output', config['video_name']), cv2.VideoWriter_fourcc(*'XVID'),
+    output = cv2.VideoWriter(os.path.join('output',config['name']+'_' + config['video_name']), cv2.VideoWriter_fourcc(*'XVID'),
                              fps, video_size)
     num_frame = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-    model.model.float()
-    
-    cnt = 0
+    yolo_model.model.float()
+    clr_config = cfg = Config.fromfile(backbones_configs[config["clrnet_backbone"]])
+    print ("buidingclr_model")
+    clr_model,clr_cfg=build_model(backbones_configs[config["clrnet_backbone"]],os.path.join("./weights/CLRNet",config['clrnet_model_name']))
+    print("builded clrmodel")
+    cnt_yolo = 0
+    cnt_clr = 0
     while video.isOpened():
         ret  , frame =  video.read()
         if not ret:
             break
-        if cnt % config['yolov5_period'] == 0:
-            pred,stride,pt=yolosingelimage(frame,model)
-        frame = addboxes(pred,frame,model)
+        if cnt_yolo % config['yolov5_period'] == 0:
+            pred,stride,pt=yolosingelimage(frame,yolo_model)
+        if cnt_clr % config['clrnet_period'] == 0:
+            lanes = clr_inference_single_image(frame,clr_model,clr_config)
+        frame = addboxes(pred,frame,yolo_model)
+        sample = get_sample(frame,clr_cfg)
+        frame = show_lanes(sample,lanes)
         output.write(frame)
-        cnt = cnt + 1
-        task.set_progress(cnt / num_frame)
+        cnt_yolo = cnt_yolo + 1
+        cnt_clr = cnt_clr +1
+        task.set_progress(cnt_yolo / num_frame)
         
         # for i in range(config['yolov5_period']-1):
         #     ret  , frame =  video.read()
@@ -120,8 +140,15 @@ def run_task(task: Task):
     video.release()
     output.release()
     task.set_status('done')
-    
-def yolosingelimage(img , model):
+def clr_inference_single_image(img, model, cfg):
+    sample = get_sample(img, cfg)
+    with torch.no_grad():
+        output = model(sample)
+        output = model.module.heads.get_lanes(output)
+    lanes = [lane.to_array(cfg) for lane in output[0]]
+    return lanes
+def yolosingelimage(_img , model):
+    img = _img.copy()
     stride, names, pt, jit, onnx, engine = model.stride, model.names, model.pt, model.jit, model.onnx, model.engine
     imgsz = check_img_size([640,640], s=stride)  # check image size
     model.eval()
