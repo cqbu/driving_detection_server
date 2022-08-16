@@ -41,6 +41,9 @@ class Task:
     def set_progress(self, progress):
         self.__info['progress'] = progress
         
+    def set_status(self, status):
+        self.__info['status'] = status
+        
 
 class TaskList:
     def __init__(self):

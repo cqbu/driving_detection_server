@@ -87,29 +87,40 @@ def download(image_name):
         return send_from_directory("videos", image_name)
     pass 
 
-def run_task(config):
-    model = DetectMultiBackend(os.path.join('./weights/yolov5',config['yolov5_model_name']), device=device, dnn=False, data="./yolov5/data/_bdd100k.yaml")  
+def run_task(task: Task):
+    task.set_status('running')
+    config = task.get_info()
+    model = DetectMultiBackend(os.path.join('./weights/yolov5',config['yolov5_model_name']), device=device, dnn=False, data="./yolov5/data/bdd100k.yaml")  
     video = cv2.VideoCapture(os.path.join('./videos',config['video_name']))
     fps = video.get(cv2.CAP_PROP_FPS)
     video_size = (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
     output = cv2.VideoWriter(os.path.join('output', config['video_name']), cv2.VideoWriter_fourcc(*'XVID'),
                              fps, video_size)
+    num_frame = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
     model.model.float()
+    
+    cnt = 0
     while video.isOpened():
         ret  , frame =  video.read()
         if not ret:
             break
-        pred,stride,pt=yolosingelimage(frame,model)
+        if cnt % config['yolov5_period'] == 0:
+            pred,stride,pt=yolosingelimage(frame,model)
         frame = addboxes(pred,frame,model)
         output.write(frame)
-        for i in range(config['yolov5_period']-1):
-            ret  , frame =  video.read()
-            if not ret:
-                break
-            frame = addboxes(pred,frame,model)
-            output.write(frame)
+        cnt = cnt + 1
+        task.set_progress(cnt / num_frame)
+        
+        # for i in range(config['yolov5_period']-1):
+        #     ret  , frame =  video.read()
+        #     if not ret:
+        #         break
+        #     frame = addboxes(pred,frame,model)
+        #     output.write(frame)
     video.release()
     output.release()
+    task.set_status('done')
+    
 def yolosingelimage(img , model):
     stride, names, pt, jit, onnx, engine = model.stride, model.names, model.pt, model.jit, model.onnx, model.engine
     imgsz = check_img_size([640,640], s=stride)  # check image size
@@ -157,7 +168,8 @@ def submit_task():
     config = json.loads(config)
     tl.add(config)
     print(config)
-    run_task(config)
+    executor.submit(run_task, tl[-1])
+    # run_task(tl[-1])
     return 'submitted'
 # 查询某个任务配置信息
 @app.route('/tasklist/<int:task_id>', methods=['GET'])
