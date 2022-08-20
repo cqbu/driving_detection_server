@@ -4,8 +4,6 @@
 
 基于flask的服务器后端
 
----
-
 ## 使用
 
 ### 克隆本仓库
@@ -34,7 +32,6 @@ python setup.py build develop
 ```
 python app.py
 ```
----
 ## 其他
 - 本仓库使用的前端：[driving_detection_app](https://github.com/exhyy/driving_detection_app)
 - [PyTorch安装](https://pytorch.org/get-started/locally/)
